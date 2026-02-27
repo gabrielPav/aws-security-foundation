@@ -265,14 +265,25 @@ variable "cloudwatch_log_retention_days" {
 
 # S3 Access Logging
 
+variable "s3_object_lock_mode" {
+  description = "S3 Object Lock retention mode. GOVERNANCE allows privileged users to override, COMPLIANCE prevents all deletions including root."
+  type        = string
+  default     = "GOVERNANCE"
+
+  validation {
+    condition     = contains(["GOVERNANCE", "COMPLIANCE"], var.s3_object_lock_mode)
+    error_message = "s3_object_lock_mode must be GOVERNANCE or COMPLIANCE."
+  }
+}
+
 variable "enable_s3_object_lock_cloudtrail" {
-  description = "Enable S3 Object Lock (Governance Mode) on the CloudTrail logs bucket. WARNING: flipping this on an existing bucket destroys and recreates it."
+  description = "Enable S3 Object Lock on the CloudTrail logs bucket. Mode controlled by s3_object_lock_mode. WARNING: flipping this on an existing bucket destroys and recreates it."
   type        = bool
   default     = false
 }
 
 variable "s3_object_lock_cloudtrail_retention_days" {
-  description = "Days to retain CloudTrail log objects under Governance Mode Object Lock"
+  description = "Days to retain CloudTrail log objects under Object Lock"
   type        = number
   default     = 90
 
@@ -283,13 +294,13 @@ variable "s3_object_lock_cloudtrail_retention_days" {
 }
 
 variable "enable_s3_object_lock_config" {
-  description = "Enable S3 Object Lock (Governance Mode) on the Config logs bucket. WARNING: flipping this on an existing bucket destroys and recreates it."
+  description = "Enable S3 Object Lock on the Config logs bucket. Mode controlled by s3_object_lock_mode. WARNING: flipping this on an existing bucket destroys and recreates it."
   type        = bool
   default     = false
 }
 
 variable "s3_object_lock_config_retention_days" {
-  description = "Days to retain Config log objects under Governance Mode Object Lock"
+  description = "Days to retain Config log objects under Object Lock"
   type        = number
   default     = 90
 
@@ -300,13 +311,13 @@ variable "s3_object_lock_config_retention_days" {
 }
 
 variable "enable_s3_object_lock_access_logs" {
-  description = "Enable S3 Object Lock (Governance Mode) on the access logs bucket. WARNING: flipping this on an existing bucket destroys and recreates it."
+  description = "Enable S3 Object Lock on the access logs bucket. Mode controlled by s3_object_lock_mode. WARNING: flipping this on an existing bucket destroys and recreates it."
   type        = bool
   default     = false
 }
 
 variable "s3_object_lock_access_logs_retention_days" {
-  description = "Days to retain access log objects under Governance Mode Object Lock"
+  description = "Days to retain access log objects under Object Lock"
   type        = number
   default     = 30
 
@@ -317,13 +328,13 @@ variable "s3_object_lock_access_logs_retention_days" {
 }
 
 variable "enable_s3_object_lock_access_logs_meta" {
-  description = "Enable S3 Object Lock (Governance Mode) on the access logs meta bucket."
+  description = "Enable S3 Object Lock on the access logs meta bucket. Mode controlled by s3_object_lock_mode."
   type        = bool
   default     = false
 }
 
 variable "s3_object_lock_access_logs_meta_retention_days" {
-  description = "Days to retain access logs meta objects under Governance Mode Object Lock"
+  description = "Days to retain access logs meta objects under Object Lock"
   type        = number
   default     = 30
 
@@ -543,6 +554,10 @@ variable "enable_inspector_lambda" {
   default     = true
 }
 
+# Lambda code scanning is a premium feature with additional cost.
+# Unlike standard Lambda scanning (which checks dependencies for known CVEs),
+# this scans your actual application code for vulnerabilities like injection flaws and hardcoded secrets.
+# To enable it, add enable_inspector_lambda_code = true in your terraform.tfvars
 variable "enable_inspector_lambda_code" {
   description = "Enable Inspector Lambda code scanning for code vulnerabilities"
   type        = bool

@@ -59,8 +59,11 @@ enable_cis_config_rules       = true
 
 cloudwatch_log_retention_days = 365
 
-# S3 Object Lock (Governance Mode): protects log objects from deletion/overwrite.
+# S3 Object Lock: protects log objects from deletion/overwrite.
+# GOVERNANCE: privileged users with s3:BypassGovernanceRetention can override.
+# COMPLIANCE: nobody can delete or shorten retention, not even root. Use with caution.
 # IMPORTANT: Enabling on an existing bucket destroys and recreates it.
+s3_object_lock_mode                            = "GOVERNANCE"
 enable_s3_object_lock_cloudtrail               = false
 s3_object_lock_cloudtrail_retention_days       = 90
 enable_s3_object_lock_config                   = false
@@ -109,10 +112,12 @@ enable_macie = true
 # macie_kms_key_arn = "arn:aws:kms:<aws-region>:<aws-account>:key/<key-id>"
 
 # Inspector
-enable_inspector        = true
-enable_inspector_ec2    = true
-enable_inspector_ecr    = true
-enable_inspector_lambda = true
+enable_inspector             = true
+enable_inspector_ec2         = true
+enable_inspector_ecr         = true
+enable_inspector_lambda      = true
+
+enable_inspector_lambda_code = false # Scans application code in Lambda functions for vulnerabilities (increases cost)
 
 # Detective
 enable_detective = true

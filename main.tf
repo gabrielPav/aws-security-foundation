@@ -82,6 +82,7 @@ module "logging" {
   cloudwatch_log_retention_days = var.cloudwatch_log_retention_days
 
   # S3 Object Lock
+  s3_object_lock_mode                      = var.s3_object_lock_mode
   enable_s3_object_lock_cloudtrail         = var.enable_s3_object_lock_cloudtrail
   s3_object_lock_cloudtrail_retention_days = var.s3_object_lock_cloudtrail_retention_days
   enable_s3_object_lock_config             = var.enable_s3_object_lock_config

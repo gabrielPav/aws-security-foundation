@@ -76,7 +76,7 @@ resource "aws_s3_bucket_object_lock_configuration" "cloudtrail" {
 
   rule {
     default_retention {
-      mode = "GOVERNANCE"
+      mode = var.s3_object_lock_mode
       days = var.s3_object_lock_cloudtrail_retention_days
     }
   }
@@ -128,7 +128,7 @@ resource "aws_s3_bucket_object_lock_configuration" "access_logs" {
 
   rule {
     default_retention {
-      mode = "GOVERNANCE"
+      mode = var.s3_object_lock_mode
       days = var.s3_object_lock_access_logs_retention_days
     }
   }
@@ -289,7 +289,7 @@ resource "aws_s3_bucket_object_lock_configuration" "access_logs_meta" {
 
   rule {
     default_retention {
-      mode = "GOVERNANCE"
+      mode = var.s3_object_lock_mode
       days = var.s3_object_lock_access_logs_meta_retention_days
     }
   }
@@ -860,7 +860,7 @@ resource "aws_s3_bucket_object_lock_configuration" "config" {
 
   rule {
     default_retention {
-      mode = "GOVERNANCE"
+      mode = var.s3_object_lock_mode
       days = var.s3_object_lock_config_retention_days
     }
   }
