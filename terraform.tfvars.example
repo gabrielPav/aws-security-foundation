@@ -57,7 +57,9 @@ enable_config                 = true
 config_log_retention_days     = 365
 enable_cis_config_rules       = true
 
-cloudwatch_log_retention_days = 365
+cloudwatch_log_retention_days      = 365
+cloudwatch_log_deletion_protection = true
+enable_cloudwatch_data_protection  = true  # Masks credentials (secret keys, private keys) if they appear in CloudTrail logs
 
 # S3 Object Lock: protects log objects from deletion/overwrite.
 # GOVERNANCE: privileged users with s3:BypassGovernanceRetention can override.

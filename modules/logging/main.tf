@@ -568,14 +568,66 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
 resource "aws_cloudwatch_log_group" "cloudtrail" {
   count = var.enable_cloudtrail ? 1 : 0
 
-  name              = "/aws/cloudtrail/${var.project_name}"
-  retention_in_days = var.cloudwatch_log_retention_days
-  kms_key_id        = var.kms_observability_key_arn
+  name                        = "/aws/cloudtrail/${var.project_name}"
+  retention_in_days           = var.cloudwatch_log_retention_days
+  kms_key_id                  = var.kms_observability_key_arn
+  deletion_protection_enabled = var.cloudwatch_log_deletion_protection
 
   tags = {
     Name    = "${var.project_name}-cloudtrail-logs"
     Purpose = "CloudTrail event streaming for real-time monitoring"
   }
+}
+
+# Automatically mask credentials if they ever show up in CloudTrail logs.
+# This catches AWS secret keys and private keys (SSH, PGP, PKCS, Putty).
+# Findings are sent to the CloudTrail S3 bucket for investigation.
+resource "aws_cloudwatch_log_data_protection_policy" "cloudtrail" {
+  count = var.enable_cloudtrail && var.enable_cloudwatch_data_protection ? 1 : 0
+
+  log_group_name = aws_cloudwatch_log_group.cloudtrail[0].name
+
+  policy_document = jsonencode({
+    Name        = "data-protection-policy"
+    Description = "Mask credentials that appear in CloudTrail logs"
+    Version     = "2021-06-01"
+    Statement = [
+      {
+        Sid = "audit-policy"
+        DataIdentifier = [
+          "arn:aws:dataprotection::aws:data-identifier/AwsSecretKey",
+          "arn:aws:dataprotection::aws:data-identifier/OpenSshPrivateKey",
+          "arn:aws:dataprotection::aws:data-identifier/PgpPrivateKey",
+          "arn:aws:dataprotection::aws:data-identifier/PkcsPrivateKey",
+          "arn:aws:dataprotection::aws:data-identifier/PuttyPrivateKey"
+        ]
+        Operation = {
+          Audit = {
+            FindingsDestination = {
+              S3 = {
+                Bucket = aws_s3_bucket.cloudtrail[0].id
+              }
+            }
+          }
+        }
+      },
+      {
+        Sid = "redact-policy"
+        DataIdentifier = [
+          "arn:aws:dataprotection::aws:data-identifier/AwsSecretKey",
+          "arn:aws:dataprotection::aws:data-identifier/OpenSshPrivateKey",
+          "arn:aws:dataprotection::aws:data-identifier/PgpPrivateKey",
+          "arn:aws:dataprotection::aws:data-identifier/PkcsPrivateKey",
+          "arn:aws:dataprotection::aws:data-identifier/PuttyPrivateKey"
+        ]
+        Operation = {
+          Deidentify = {
+            MaskConfig = {}
+          }
+        }
+      }
+    ]
+  })
 }
 
 # IAM role for CloudTrail to write to CloudWatch Logs

@@ -79,7 +79,9 @@ module "logging" {
   enable_config_rule_s3_encryption     = var.enable_config_rule_s3_encryption
 
   # CloudWatch
-  cloudwatch_log_retention_days = var.cloudwatch_log_retention_days
+  cloudwatch_log_retention_days          = var.cloudwatch_log_retention_days
+  cloudwatch_log_deletion_protection     = var.cloudwatch_log_deletion_protection
+  enable_cloudwatch_data_protection      = var.enable_cloudwatch_data_protection
 
   # S3 Object Lock
   s3_object_lock_mode                      = var.s3_object_lock_mode
