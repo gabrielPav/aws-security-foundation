@@ -1,0 +1,280 @@
+# ==============================================================================
+# AWS Security Foundation - Example Configuration
+# ==============================================================================
+# Copy this file to terraform.tfvars and customize your environment.
+# All security services are enabled by default. 
+# Organization features are disabled by default and must be explicitly opted in.
+# ==============================================================================
+
+# General
+aws_region   = "us-east-1"
+project_name = "security-baseline"
+common_tags = {
+  Owner       = "security-team"
+  CostCenter  = "security"
+  Compliance  = "CIS-AWS"
+}
+
+# Account Context
+# Set to true ONLY if this is the AWS Organizations management account
+is_organization_account = false
+# organization_id       = "o-abc123def4"
+
+# =====================================================================
+# 1. Identity & Access Management
+# =====================================================================
+password_minimum_length       = 14   
+password_reuse_prevention     = 24   
+password_max_age_days         = 90 
+password_hard_expiry          = true
+enable_unused_access_analyzer = true
+unused_access_age_days        = 90
+
+# =====================================================================
+# 2. Encryption & Data Protection
+# =====================================================================
+# Customer-managed KMS keys are created automatically for each layer:
+# - Compute (EBS, Auto Scaling).
+# - Storage (S3 log buckets for CloudTrail and Config).
+# - Observability (CloudTrail, CloudWatch Logs, SNS).
+#
+# KMS key rotation period (90 - 2560 days).
+kms_rotation_period_days = 90
+#
+# To override the KMS key for EBS encryption with an existing, external key:
+# ebs_default_kms_key_arn = "arn:aws:kms:<aws-region>:<aws-account>:key/<key-id>"
+
+# =====================================================================
+# 3. Logging & Monitoring
+# =====================================================================
+enable_cloudtrail             = true
+cloudtrail_log_retention_days = 365
+is_organization_trail         = false
+
+enable_s3_data_events         = false # Enable for object-level audit (increases cost)
+
+enable_config                 = true
+config_log_retention_days     = 365
+enable_cis_config_rules       = true
+
+cloudwatch_log_retention_days = 365
+
+# S3 Object Lock (Governance Mode): protects log objects from deletion/overwrite.
+# IMPORTANT: Enabling on an existing bucket destroys and recreates it.
+enable_s3_object_lock_cloudtrail               = false
+s3_object_lock_cloudtrail_retention_days       = 90
+enable_s3_object_lock_config                   = false
+s3_object_lock_config_retention_days           = 90
+enable_s3_object_lock_access_logs              = false
+s3_object_lock_access_logs_retention_days      = 30
+enable_s3_object_lock_access_logs_meta         = false
+s3_object_lock_access_logs_meta_retention_days = 30
+
+# Security Alarms (CIS-aligned CloudWatch metric filters + alarms).
+# Only created when BOTH enable_security_alarms = true AND alarm_notification_email is set.
+enable_security_alarms       = true
+alarm_notification_email     = "secops@domain.com"
+
+# Route HIGH/CRITICAL findings from GuardDuty, Security Hub, Inspector, and Macie
+# to the security alarms SNS topic via EventBridge. Requires alarm_notification_email.
+enable_finding_notifications = true
+
+# =======================================================================
+# 4. Threat Detection & Security Services
+# =======================================================================
+
+# GuardDuty
+enable_guardduty                    = true
+enable_guardduty_s3_protection      = true
+enable_guardduty_eks_protection     = true
+enable_guardduty_malware_protection = true
+enable_guardduty_rds_protection     = true
+enable_guardduty_runtime_monitoring = true
+enable_guardduty_lambda_protection  = true
+
+# Security Hub
+enable_security_hub                  = true
+enable_security_hub_cross_region     = true
+
+# Security Hub Standards
+enable_security_hub_cis              = true
+enable_security_hub_aws_foundational = true
+enable_security_hub_pci_dss          = false
+enable_security_hub_nist_800_171     = false
+enable_security_hub_nist_800_53      = false
+
+# Macie
+enable_macie = true
+# macie_classification_export_bucket_name = "<macie-results-bucket>"
+# macie_kms_key_arn = "arn:aws:kms:<aws-region>:<aws-account>:key/<key-id>"
+
+# Inspector
+enable_inspector        = true
+enable_inspector_ec2    = true
+enable_inspector_ecr    = true
+enable_inspector_lambda = true
+
+# Detective
+enable_detective = true
+
+# =====================================================================
+# 5. AWS Organizations Guardrails (enable only for management account)
+# =====================================================================
+enable_scps         = false
+# scp_target_ou_ids = ["ou-abc1-12345678", "r-abc1"]
+# allowed_regions   = ["us-east-1", "us-west-2", "eu-west-1"]
+
+enable_tag_policies      = false
+enable_backup_policies   = false
+backup_retention_days    = 35
+enable_ai_opt_out_policy = false
+enable_ram_org_sharing   = false
+
+# ====================================================================
+# 6. Billing & Account Governance
+# ====================================================================
+enable_budget_alerts          = true
+monthly_budget_amount         = 1000
+budget_notification_emails    = ["secops@domain.com", "billing@domain.com", "finops@domain.com"]
+enable_cost_anomaly_detection = true
+cost_anomaly_threshold_amount = 100
+
+# Alternate Contacts
+security_contact_name  = "Security Team"
+security_contact_title = "Cloud Security Lead"
+security_contact_email = "secops@domain.com"
+security_contact_phone = "+1-555-0100"
+
+billing_contact_name   = "Finance Team"
+billing_contact_title  = "Cloud Finance Manager"
+billing_contact_email  = "billing@domain.com"
+billing_contact_phone  = "+1-555-0200"
+
+operations_contact_name  = "Operations Team"
+operations_contact_title = "Cloud Operations Lead"
+operations_contact_email = "ops@domain.com"
+operations_contact_phone = "+1-555-0300"
+
+# ====================================================================
+# 7. Controls Enabled/Disabled by Default
+# ====================================================================
+#
+# | #  | Control                                          | Default  |
+# |----|--------------------------------------------------|----------|
+# |                 Identity & Access Management                     |
+# | 1  | IAM password policy                              | Enabled  |
+# | 2  | IAM External Access Analyzer                     | Enabled  |
+# | 3  | IAM Unused Access Analyzer                       | Enabled  |
+# |                    S3 Account Security                           |
+# | 4  | S3 Account-level Public Access Block             | Enabled  |
+# |               Encryption & Data Protection                       |
+# | 5  | EBS encryption by default                        | Enabled  |
+# | 6  | KMS key — Compute layer with rotation            | Enabled  |
+# | 7  | KMS key — Observability layer with rotation      | Enabled  |
+# | 8  | KMS key — Storage layer with rotation            | Enabled  |
+# | 9  | EBS default KMS key set to compute key           | Enabled  |
+# | 10 | Block public AMI sharing                         | Enabled  |
+# | 11 | Block public EBS snapshot sharing                | Enabled  |
+# | 12 | IMDSv2 enforced as account default               | Enabled  |
+# | 13 | EC2 Serial Console access disabled               | Enabled  |
+# | 14 | EMR Block Public Access                          | Enabled  |
+# |                   Logging — CloudTrail                           |
+# | 15 | CloudTrail multi-region trail                    | Enabled  |
+# | 16 | CloudTrail log file validation                   | Enabled  |
+# | 17 | CloudTrail encrypted with KMS                    | Enabled  |
+# | 18 | CloudTrail CloudWatch Logs integration           | Enabled  |
+# | 19 | CloudTrail Insights                              | Enabled  |
+# | 20 | CloudTrail management events                     | Enabled  |
+# | 21 | CloudTrail S3 bucket (hardened)                  | Enabled  |
+# | 22 | CloudTrail S3 Object Lock                        | Disabled |
+# |                   Logging — AWS Config                           |
+# | 23 | Config recorder enabled                          | Enabled  |
+# | 24 | Config delivery channel                          | Enabled  |
+# | 25 | Config S3 bucket (hardened)                      | Enabled  |
+# | 26 | Config S3 Object Lock                            | Disabled |
+# |                 Logging — CIS Config Rules                       |
+# | 27 | Config rule: iam-root-access-key-check           | Enabled  |
+# | 28 | Config rule: root-account-mfa-enabled            | Enabled  |
+# | 29 | Config rule: root-account-hardware-mfa-enabled   | Enabled  |
+# | 30 | Config rule: encrypted-volumes                   | Enabled  |
+# | 31 | Config rule: rds-storage-encrypted               | Enabled  |
+# | 32 | Config rule: cmk-backing-key-rotation-enabled    | Enabled  |
+# | 33 | Config rule: vpc-default-security-group-closed   | Enabled  |
+# | 34 | Config rule: iam-user-mfa-enabled                | Enabled  |
+# | 35 | Config rule: s3-bucket-server-side-encryption    | Enabled  |
+# |              Logging — S3 Access Logging Chain                   |
+# | 36 | S3 access logs bucket (hardened)                 | Enabled  |
+# | 37 | S3 access logs meta bucket (hardened)            | Enabled  |
+# | 38 | CloudTrail bucket logs to access logs bucket     | Enabled  |
+# | 39 | Access logs bucket logs to meta bucket           | Enabled  |
+# |            Logging — CloudWatch Security Alarms                  |
+# | 40 | CloudWatch log group with retention and KMS      | Enabled  |
+# | 41 | Alarm: Console sign-in without MFA               | Enabled  |
+# | 42 | Alarm: Console sign-in failures                  | Enabled  |
+# | 43 | Alarm: CloudTrail configuration changes          | Enabled  |
+# | 44 | Alarm: AWS Config changes                        | Enabled  |
+# | 45 | Alarm: IAM policy changes                        | Enabled  |
+# | 46 | Alarm: KMS CMK disabled/deletion scheduled       | Enabled  |
+# | 47 | Alarm: S3 bucket policy changes                  | Enabled  |
+# | 48 | Alarm: Security group changes                    | Enabled  |
+# | 49 | Alarm: Network gateway changes                   | Enabled  |
+# | 50 | Alarm: Route table changes                       | Enabled  |
+# | 51 | Alarm: VPC changes                               | Enabled  |
+# | 52 | Alarm: Unauthorized API calls                    | Enabled  |
+# | 53 | Alarm: EC2 instance lifecycle events             | Enabled  |
+# | 54 | Network ACL modifications                        | Enabled  |
+# | 55 | Alarm: Root account usage                        | Enabled  |
+# |              Logging — Notification Pipeline                     |
+# | 56 | SNS topic (KMS encrypted)                        | Enabled  |
+# | 57 | SNS email subscription                           | Enabled  |
+# | 58 | SNS topic policy                                 | Enabled  |
+# | 59 | SQS DLQ for SNS failures                         | Enabled  |
+# | 60 | CloudWatch security dashboard                    | Enabled  |
+# |         Logging — EventBridge Finding Notifications              |
+# | 61 | EventBridge: GuardDuty HIGH/CRITICAL             | Enabled  |
+# | 62 | EventBridge: Security Hub HIGH/CRITICAL          | Enabled  |
+# | 63 | EventBridge: Inspector HIGH/CRITICAL             | Enabled  |
+# | 64 | EventBridge: Macie High/Critical                 | Enabled  |
+# | 65 | SQS DLQ for EventBridge failures                 | Enabled  |
+# |                     Threat Detection                             |
+# | 66 | GuardDuty detector                               | Enabled  |
+# | 67 | GuardDuty: S3 data events                        | Enabled  |
+# | 68 | GuardDuty: EKS audit logs                        | Enabled  |
+# | 69 | GuardDuty: EBS malware protection                | Enabled  |
+# | 70 | GuardDuty: RDS login events                      | Enabled  |
+# | 71 | GuardDuty: Runtime monitoring                    | Enabled  |
+# | 72 | GuardDuty: Lambda network logs                   | Enabled  |
+# | 73 | Security Hub enabled                             | Enabled  |
+# | 74 | Macie enabled                                    | Enabled  |
+# | 75 | Inspector v2 enabled (EC2, ECR, Lambda)          | Enabled  |
+# | 76 | Detective graph                                  | Enabled  |
+# | 77 | Security Hub cross-region aggregation            | Enabled  |
+# |          Threat Detection — Security Hub Standards               |
+# | 78 | CIS AWS Foundations Benchmark v3.0.0             | Enabled  |
+# | 79 | AWS Foundational Security Best Practices v1.0.0  | Enabled  |
+# | 80 | PCI DSS v4.0.1                                   | Disabled |
+# | 81 | NIST 800-171 v2.0.0                              | Disabled |
+# | 82 | NIST 800-53 v5.0.0                               | Disabled |
+# |              Organizations Guardrails — SCPs                     |
+# | 83 | SCP: Deny root user actions                      | Disabled |
+# | 84 | SCP: Deny unapproved regions                     | Disabled |
+# | 85 | SCP: Deny disabling security services            | Disabled |
+# | 86 | SCP: Enforce encryption                          | Disabled |
+# | 87 | SCP: Deny public AMI/EBS sharing                 | Disabled |
+# | 88 | SCP: Deny leaving organization                   | Disabled |
+# | 89 | SCP: Deny deleting VPC flow logs                 | Disabled |
+# | 90 | SCP: Deny deactivating MFA / root keys           | Disabled |
+# | 91 | SCP: Deny IMDSv1                                 | Disabled |
+# |            Organizations Guardrails — Policies                   |
+# | 92 | Tag policy                                       | Disabled |
+# | 93 | Backup policy                                    | Disabled |
+# | 94 | AI services opt-out policy                       | Disabled |
+# | 95 | RAM organization sharing                         | Disabled |
+# |               Billing & Account Governance                       |
+# | 96 | Monthly budget with alerts                       | Enabled  |
+# | 97 | Cost Anomaly Detection monitor                   | Enabled  |
+# | 98 | Cost Anomaly Detection subscription              | Enabled  |
+# | 99 | Alternate contact: Security                      | Disabled |
+# | 100 | Alternate contact: Billing                      | Disabled |
+# | 101 | Alternate contact: Operations                   | Disabled |
+# |-----|-------------------------------------------------|----------|
