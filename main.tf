@@ -104,6 +104,7 @@ module "logging" {
 
   # Finding notifications (EventBridge → SNS for HIGH/CRITICAL findings)
   enable_finding_notifications = var.enable_finding_notifications
+  eventbridge_bus_name         = var.eventbridge_bus_name
 
 }
 

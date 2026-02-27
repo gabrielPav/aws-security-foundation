@@ -176,6 +176,12 @@ variable "enable_finding_notifications" {
   default     = true
 }
 
+variable "eventbridge_bus_name" {
+  description = "Name of the EventBridge bus to use for finding notifications. Defaults to the default bus."
+  type        = string
+  default     = "default"
+}
+
 variable "is_organization_account" {
   description = "Whether this is an Organization management account. Controls whether Organizations change alarms are created."
   type        = bool

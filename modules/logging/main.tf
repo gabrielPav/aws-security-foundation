@@ -1347,6 +1347,9 @@ resource "aws_sns_topic" "security_alarms" {
   name              = "${var.project_name}-security-alarms"
   kms_master_key_id = var.kms_observability_key_id
 
+  # X-Ray tracing for end-to-end visibility into notification delivery
+  tracing_config = "Active"
+
   tags = {
     Name    = "${var.project_name}-security-alarms"
     Purpose = "Security alarm notifications"
@@ -1555,6 +1558,82 @@ resource "aws_cloudwatch_dashboard" "security" {
   })
 }
 
+# EventBridge bus - encrypt with KMS and lock down with a resource policy.
+# Only the account itself can put events and manage rules it created.
+
+resource "aws_cloudwatch_event_bus" "main" {
+  count = local.create_finding_notifications && var.eventbridge_bus_name != "default" ? 1 : 0
+
+  name              = var.eventbridge_bus_name
+  kms_key_identifier = var.kms_observability_key_arn
+
+  tags = {
+    Name    = "${var.project_name}-event-bus"
+    Purpose = "Security finding event routing"
+  }
+}
+
+# Encrypt the default bus with KMS when using it
+resource "aws_cloudwatch_event_bus" "default_encryption" {
+  count = local.create_finding_notifications && var.eventbridge_bus_name == "default" ? 1 : 0
+
+  name               = "default"
+  kms_key_identifier = var.kms_observability_key_arn
+}
+
+# Resource policy - least privilege: only this account can put events and manage its own rules
+resource "aws_cloudwatch_event_bus_policy" "main" {
+  count = local.create_finding_notifications ? 1 : 0
+
+  event_bus_name = var.eventbridge_bus_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowAccountToPutEvents"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "events:PutEvents"
+        Resource = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:event-bus/${var.eventbridge_bus_name}"
+      },
+      {
+        Sid    = "AllowAccountToManageItsRules"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "events:PutRule",
+          "events:PutTargets",
+          "events:DeleteRule",
+          "events:RemoveTargets",
+          "events:DisableRule",
+          "events:EnableRule",
+          "events:TagResource",
+          "events:UntagResource",
+          "events:DescribeRule",
+          "events:ListTargetsByRule",
+          "events:ListTagsForResource"
+        ]
+        Resource = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${var.eventbridge_bus_name}/*"
+        Condition = {
+          StringEqualsIfExists = {
+            "events:creatorAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
+
+  depends_on = [
+    aws_cloudwatch_event_bus.main,
+    aws_cloudwatch_event_bus.default_encryption
+  ]
+}
+
 # EventBridge rules - route HIGH/CRITICAL findings from security services to SNS
 
 locals {
@@ -1610,8 +1689,9 @@ locals {
 resource "aws_cloudwatch_event_rule" "findings" {
   for_each = local.finding_notification_rules
 
-  name        = "${var.project_name}-${each.value}-high-critical"
-  description = "Route HIGH and CRITICAL ${each.value} findings to SNS"
+  name           = "${var.project_name}-${each.value}-high-critical"
+  description    = "Route HIGH and CRITICAL ${each.value} findings to SNS"
+  event_bus_name = var.eventbridge_bus_name
 
   event_pattern = local.finding_notification_config[each.value].event_pattern
 
@@ -1662,9 +1742,10 @@ resource "aws_sqs_queue_policy" "findings_dlq" {
 resource "aws_cloudwatch_event_target" "findings_to_sns" {
   for_each = local.finding_notification_rules
 
-  rule      = aws_cloudwatch_event_rule.findings[each.key].name
-  target_id = "${each.value}-to-sns"
-  arn       = aws_sns_topic.security_alarms[0].arn
+  rule           = aws_cloudwatch_event_rule.findings[each.key].name
+  event_bus_name = var.eventbridge_bus_name
+  target_id      = "${each.value}-to-sns"
+  arn            = aws_sns_topic.security_alarms[0].arn
 
   dead_letter_config {
     arn = aws_sqs_queue.findings_dlq[0].arn

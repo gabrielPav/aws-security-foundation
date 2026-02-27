@@ -198,6 +198,24 @@ resource "aws_kms_key" "observability" {
             "aws:SourceAccount" = local.account_id
           }
         }
+      },
+      {
+        Sid    = "AllowEventBridgeToUseTheKey"
+        Effect = "Allow"
+        Principal = {
+          Service = "events.amazonaws.com"
+        }
+        Action = [
+          "kms:GenerateDataKey*",
+          "kms:Decrypt",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = local.account_id
+          }
+        }
       }
     ]
   })

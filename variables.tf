@@ -393,6 +393,12 @@ variable "enable_finding_notifications" {
   default     = false
 }
 
+variable "eventbridge_bus_name" {
+  description = "Name of the EventBridge bus to use for finding notifications. Defaults to the default bus."
+  type        = string
+  default     = "default"
+}
+
 # Threat Detection & Security Services
 
 # GuardDuty
