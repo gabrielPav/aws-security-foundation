@@ -168,6 +168,12 @@ variable "cloudtrail_log_retention_days" {
   default     = 2555
 }
 
+variable "noncurrent_version_retention_days" {
+  description = "Days to retain noncurrent S3 object versions in CloudTrail and Config buckets before expiration. Should align with your log retention policy."
+  type        = number
+  default     = 90
+}
+
 variable "is_organization_trail" {
   description = "Create an organization-wide CloudTrail (requires management account)"
   type        = bool
@@ -391,12 +397,6 @@ variable "enable_finding_notifications" {
   description = "Route HIGH and CRITICAL findings from GuardDuty, Security Hub, Inspector, and Macie to the security alarms SNS topic via EventBridge. Requires alarm_notification_email to be set."
   type        = bool
   default     = false
-}
-
-variable "eventbridge_bus_name" {
-  description = "Name of the EventBridge bus to use for finding notifications. Defaults to the default bus."
-  type        = string
-  default     = "default"
 }
 
 # Threat Detection & Security Services

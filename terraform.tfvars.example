@@ -48,8 +48,9 @@ kms_rotation_period_days = 90
 # 3. Logging & Monitoring
 # =====================================================================
 enable_cloudtrail             = true
-cloudtrail_log_retention_days = 365
-is_organization_trail         = false
+cloudtrail_log_retention_days     = 365
+noncurrent_version_retention_days = 90  # Noncurrent S3 object versions in CloudTrail and Config buckets
+is_organization_trail             = false
 
 enable_s3_data_events         = false # Enable for object-level audit (increases cost)
 
@@ -77,16 +78,12 @@ s3_object_lock_access_logs_meta_retention_days = 30
 
 # Security Alarms (CIS-aligned CloudWatch metric filters + alarms).
 # Only created when BOTH enable_security_alarms = true AND alarm_notification_email is set.
-enable_security_alarms       = true
-alarm_notification_email     = "secops@domain.com"
+enable_security_alarms   = true
+alarm_notification_email = "secops@domain.com"
 
-# Route HIGH/CRITICAL findings from GuardDuty, Security Hub, Inspector, and Macie
-# to the security alarms SNS topic via EventBridge. Requires alarm_notification_email.
+# Route HIGH/CRITICAL findings from GuardDuty, Security Hub, Inspector, and Macie to SNS via EventBridge rules on the default bus
+# Requires alarm_notification_email.
 enable_finding_notifications = true
-
-# EventBridge bus used for finding notifications. Encrypted with KMS and locked down with a resource policy. 
-# Change this if you use a custom bus instead of the default.
-eventbridge_bus_name = "default"
 
 # =======================================================================
 # 4. Threat Detection & Security Services
@@ -243,53 +240,51 @@ operations_contact_phone = "+1-555-0300"
 # | 61 | SQS DLQ for SNS failures                         | Enabled  |
 # | 62 | CloudWatch security dashboard                    | Enabled  |
 # |         Logging — EventBridge Finding Notifications              |
-# | 63 | EventBridge bus KMS encryption                   | Enabled  |
-# | 64 | EventBridge bus resource policy                  | Enabled  |
-# | 65 | EventBridge: GuardDuty HIGH/CRITICAL             | Enabled  |
-# | 66 | EventBridge: Security Hub HIGH/CRITICAL          | Enabled  |
-# | 67 | EventBridge: Inspector HIGH/CRITICAL             | Enabled  |
-# | 68 | EventBridge: Macie High/Critical                 | Enabled  |
-# | 69 | SQS DLQ for EventBridge failures                 | Enabled  |
+# | 63 | EventBridge: GuardDuty HIGH/CRITICAL             | Enabled  |
+# | 64 | EventBridge: Security Hub HIGH/CRITICAL          | Enabled  |
+# | 65 | EventBridge: Inspector HIGH/CRITICAL             | Enabled  |
+# | 66 | EventBridge: Macie High/Critical                 | Enabled  |
+# | 67 | SQS DLQ for EventBridge failures                 | Enabled  |
 # |                     Threat Detection                             |
-# | 70 | GuardDuty detector                               | Enabled  |
-# | 71 | GuardDuty: S3 data events                        | Enabled  |
-# | 72 | GuardDuty: EKS audit logs                        | Enabled  |
-# | 73 | GuardDuty: EBS malware protection                | Enabled  |
-# | 74 | GuardDuty: RDS login events                      | Enabled  |
-# | 75 | GuardDuty: Runtime monitoring                    | Enabled  |
-# | 76 | GuardDuty: Lambda network logs                   | Enabled  |
-# | 77 | Security Hub enabled                             | Enabled  |
-# | 78 | Macie enabled                                    | Enabled  |
-# | 79 | Inspector v2 enabled (EC2, ECR, Lambda)          | Enabled  |
-# | 80 | Inspector Lambda code scanning                   | Disabled |
-# | 81 | Detective graph                                  | Enabled  |
-# | 82 | Security Hub cross-region aggregation            | Enabled  |
+# | 68 | GuardDuty detector                               | Enabled  |
+# | 69 | GuardDuty: S3 data events                        | Enabled  |
+# | 70 | GuardDuty: EKS audit logs                        | Enabled  |
+# | 71 | GuardDuty: EBS malware protection                | Enabled  |
+# | 72 | GuardDuty: RDS login events                      | Enabled  |
+# | 73 | GuardDuty: Runtime monitoring                    | Enabled  |
+# | 74 | GuardDuty: Lambda network logs                   | Enabled  |
+# | 75 | Security Hub enabled                             | Enabled  |
+# | 76 | Macie enabled                                    | Enabled  |
+# | 77 | Inspector v2 enabled (EC2, ECR, Lambda)          | Enabled  |
+# | 78 | Inspector Lambda code scanning                   | Disabled |
+# | 79 | Detective graph                                  | Enabled  |
+# | 80 | Security Hub cross-region aggregation            | Enabled  |
 # |          Threat Detection — Security Hub Standards               |
-# | 83 | CIS AWS Foundations Benchmark v3.0.0             | Enabled  |
-# | 84 | AWS Foundational Security Best Practices v1.0.0  | Enabled  |
-# | 85 | PCI DSS v4.0.1                                   | Disabled |
-# | 86 | NIST 800-171 v2.0.0                              | Disabled |
-# | 87 | NIST 800-53 v5.0.0                               | Disabled |
+# | 81 | CIS AWS Foundations Benchmark v3.0.0             | Enabled  |
+# | 82 | AWS Foundational Security Best Practices v1.0.0  | Enabled  |
+# | 83 | PCI DSS v4.0.1                                   | Disabled |
+# | 84 | NIST 800-171 v2.0.0                              | Disabled |
+# | 85 | NIST 800-53 v5.0.0                               | Disabled |
 # |              Organizations Guardrails — SCPs                     |
-# | 88 | SCP: Deny root user actions                      | Disabled |
-# | 89 | SCP: Deny unapproved regions                     | Disabled |
-# | 90 | SCP: Deny disabling security services            | Disabled |
-# | 91 | SCP: Enforce encryption                          | Disabled |
-# | 92 | SCP: Deny public AMI/EBS sharing                 | Disabled |
-# | 93 | SCP: Deny leaving organization                   | Disabled |
-# | 94 | SCP: Deny deleting VPC flow logs                 | Disabled |
-# | 95 | SCP: Deny deactivating MFA / root keys           | Disabled |
-# | 96 | SCP: Deny IMDSv1                                 | Disabled |
+# | 86 | SCP: Deny root user actions                      | Disabled |
+# | 87 | SCP: Deny unapproved regions                     | Disabled |
+# | 88 | SCP: Deny disabling security services            | Disabled |
+# | 89 | SCP: Enforce encryption                          | Disabled |
+# | 90 | SCP: Deny public AMI/EBS sharing                 | Disabled |
+# | 91 | SCP: Deny leaving organization                   | Disabled |
+# | 92 | SCP: Deny deleting VPC flow logs                 | Disabled |
+# | 93 | SCP: Deny deactivating MFA / root keys           | Disabled |
+# | 94 | SCP: Deny IMDSv1                                 | Disabled |
 # |            Organizations Guardrails — Policies                   |
-# | 97 | Tag policy                                       | Disabled |
-# | 98 | Backup policy                                    | Disabled |
-# | 99 | AI services opt-out policy                       | Disabled |
-# | 100 | RAM organization sharing                        | Disabled |
+# | 95 | Tag policy                                       | Disabled |
+# | 96 | Backup policy                                    | Disabled |
+# | 97 | AI services opt-out policy                       | Disabled |
+# | 98 | RAM organization sharing                         | Disabled |
 # |               Billing & Account Governance                       |
-# | 101 | Monthly budget with alerts                      | Enabled  |
-# | 102 | Cost Anomaly Detection monitor                  | Enabled  |
-# | 103 | Cost Anomaly Detection subscription             | Enabled  |
-# | 104 | Alternate contact: Security                     | Disabled |
-# | 105 | Alternate contact: Billing                      | Disabled |
-# | 106 | Alternate contact: Operations                   | Disabled |
+# | 99  | Monthly budget with alerts                      | Enabled  |
+# | 100 | Cost Anomaly Detection monitor                  | Enabled  |
+# | 101 | Cost Anomaly Detection subscription             | Enabled  |
+# | 102 | Alternate contact: Security                     | Disabled |
+# | 103 | Alternate contact: Billing                      | Disabled |
+# | 104 | Alternate contact: Operations                   | Disabled |
 # |-----|-------------------------------------------------|----------|

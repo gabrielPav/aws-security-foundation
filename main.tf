@@ -58,8 +58,9 @@ module "logging" {
   kms_storage_key_arn       = module.encryption.kms_storage_key_arn
 
   # CloudTrail
-  enable_cloudtrail             = var.enable_cloudtrail
-  cloudtrail_log_retention_days = var.cloudtrail_log_retention_days
+  enable_cloudtrail                  = var.enable_cloudtrail
+  cloudtrail_log_retention_days      = var.cloudtrail_log_retention_days
+  noncurrent_version_retention_days  = var.noncurrent_version_retention_days
   is_organization_trail         = var.is_organization_account && var.is_organization_trail
   organization_id               = var.organization_id
   enable_s3_data_events         = var.enable_s3_data_events
@@ -104,7 +105,6 @@ module "logging" {
 
   # Finding notifications (EventBridge → SNS for HIGH/CRITICAL findings)
   enable_finding_notifications = var.enable_finding_notifications
-  eventbridge_bus_name         = var.eventbridge_bus_name
 
 }
 

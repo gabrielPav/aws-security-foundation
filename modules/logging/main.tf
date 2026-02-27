@@ -3,6 +3,14 @@
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
+# =====================================================================
+# 1. S3 Audit Buckets
+#    CloudTrail, Config, access logs, and access logs meta buckets.
+#    Hardened: versioning, public access blocking, ACLs disabled,
+#    KMS encryption (AES256 for log-target buckets), TLS-only policies,
+#    lifecycle management, and optional Object Lock (Governance Mode).
+# =====================================================================
+
 # CloudTrail S3 bucket
 resource "aws_s3_bucket" "cloudtrail" {
   count = var.enable_cloudtrail ? 1 : 0
@@ -94,11 +102,6 @@ resource "aws_s3_bucket" "access_logs" {
     Name    = "${var.project_name}-s3-access-logs"
     Purpose = "Centralized S3 server access logs"
   }
-
-  # Uncomment in production - this bucket is your audit trail
-  # lifecycle {
-  #   prevent_destroy = true
-  # }
 }
 
 resource "aws_s3_bucket_ownership_controls" "access_logs" {
@@ -167,9 +170,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
     status = "Enabled"
     filter {}
 
-    transition {
-      days          = 30
-      storage_class = "STANDARD_IA"
+    dynamic "transition" {
+      for_each = var.access_log_retention_days > var.s3_transition_to_ia_days ? [1] : []
+      content {
+        days          = var.s3_transition_to_ia_days
+        storage_class = "STANDARD_IA"
+      }
     }
   }
 
@@ -178,9 +184,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
     status = "Enabled"
     filter {}
 
-    transition {
-      days          = 90
-      storage_class = "GLACIER"
+    dynamic "transition" {
+      for_each = var.access_log_retention_days > var.s3_transition_to_glacier_days ? [1] : []
+      content {
+        days          = var.s3_transition_to_glacier_days
+        storage_class = "GLACIER"
+      }
     }
   }
 
@@ -328,9 +337,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs_meta" {
     status = "Enabled"
     filter {}
 
-    transition {
-      days          = 30
-      storage_class = "STANDARD_IA"
+    dynamic "transition" {
+      for_each = var.access_log_retention_days > var.s3_transition_to_ia_days ? [1] : []
+      content {
+        days          = var.s3_transition_to_ia_days
+        storage_class = "STANDARD_IA"
+      }
     }
   }
 
@@ -339,9 +351,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs_meta" {
     status = "Enabled"
     filter {}
 
-    transition {
-      days          = 90
-      storage_class = "GLACIER"
+    dynamic "transition" {
+      for_each = var.access_log_retention_days > var.s3_transition_to_glacier_days ? [1] : []
+      content {
+        days          = var.s3_transition_to_glacier_days
+        storage_class = "GLACIER"
+      }
     }
   }
 
@@ -464,7 +479,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
     }
 
     noncurrent_version_expiration {
-      noncurrent_days = 90
+      noncurrent_days = var.noncurrent_version_retention_days
     }
   }
 
@@ -543,6 +558,7 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
           }
         }
       },
+      # Both keys allowed: CloudTrail writes with the observability key, S3 encrypts at rest with the storage key
       {
         Sid       = "DenyWrongKMSKey"
         Effect    = "Deny"
@@ -563,6 +579,12 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
     aws_s3_bucket_ownership_controls.cloudtrail[0]
   ]
 }
+
+# =====================================================================
+# 2. CloudTrail
+#    Multi-region trail with CloudWatch Logs integration, credential
+#    masking via data protection policy, and IAM role for log delivery.
+# =====================================================================
 
 # CloudWatch log group for CloudTrail - enables real-time metric filter alerting
 resource "aws_cloudwatch_log_group" "cloudtrail" {
@@ -702,7 +724,10 @@ resource "aws_cloudtrail" "main" {
   cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cloudtrail[0].arn}:*"
   cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch[0].arn
 
-  # Encrypt trail logs with the observability layer KMS key
+  # Two-layer encryption by design: CloudTrail encrypts log files with the observability
+  # key before writing to S3, then S3 applies its own at-rest encryption with the storage
+  # key. The bucket policy allows both keys for this reason. Different keys because
+  # CloudTrail logs feed CloudWatch (observability concern) but are stored in S3 (storage concern).
   kms_key_id = var.kms_observability_key_arn
 
   # Include global service events (IAM, STS, CloudFront) in the trail
@@ -766,6 +791,13 @@ resource "aws_cloudtrail" "main" {
     Security = "audit-trail"
   }
 }
+
+# =====================================================================
+# 3. AWS Config
+#    Configuration recorder, S3 bucket for snapshots, delivery channel,
+#    IAM role, and CIS-aligned Config rules. Includes pre-flight checks
+#    to detect existing recorders/channels before deployment.
+# =====================================================================
 
 # Pre-flight: detect existing Config resources (AWS allows only one recorder and one delivery channel per region)
 data "external" "existing_config_recorder" {
@@ -961,7 +993,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "config" {
     }
 
     noncurrent_version_expiration {
-      noncurrent_days = 90
+      noncurrent_days = var.noncurrent_version_retention_days
     }
   }
 
@@ -1038,6 +1070,30 @@ resource "aws_s3_bucket_policy" "config" {
         Condition = {
           Bool = {
             "aws:SecureTransport" = "false"
+          }
+        }
+      },
+      {
+        Sid       = "DenyUnencryptedObjectUploads"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.config[0].arn}/*"
+        Condition = {
+          StringNotEquals = {
+            "s3:x-amz-server-side-encryption" = "aws:kms"
+          }
+        }
+      },
+      {
+        Sid       = "DenyWrongKMSKey"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.config[0].arn}/*"
+        Condition = {
+          StringNotEqualsIfExists = {
+            "s3:x-amz-server-side-encryption-aws-kms-key-id" = var.kms_storage_key_arn
           }
         }
       }
@@ -1187,6 +1243,12 @@ resource "aws_config_config_rule" "cis" {
   }
 }
 
+# =====================================================================
+# 4. Validation Preconditions
+#    Catch cross-variable misconfigurations at plan time instead of
+#    silently skipping resources or failing at apply time.
+# =====================================================================
+
 # Cross-variable preconditions - catch misconfigurations at plan time instead of silently skipping resources
 
 resource "terraform_data" "validate_security_alarms" {
@@ -1221,6 +1283,12 @@ resource "terraform_data" "validate_cis_config_rules" {
     }
   }
 }
+
+# =====================================================================
+# 5. Security Alarms & Notifications
+#    SNS topic, CIS-aligned CloudWatch metric filters and alarms,
+#    email subscription with DLQ, and security dashboard.
+# =====================================================================
 
 # CloudWatch Security Alarms - CIS-aligned metric filters and alarms
 # For active security monitoring, set alarm_notification_email.
@@ -1558,83 +1626,16 @@ resource "aws_cloudwatch_dashboard" "security" {
   })
 }
 
-# EventBridge bus - encrypt with KMS and lock down with a resource policy.
-# Only the account itself can put events and manage rules it created.
+# =====================================================================
+# 6. Finding Notifications (EventBridge)
+#    EventBridge rules on the default bus that route HIGH/CRITICAL
+#    findings from GuardDuty, Security Hub, Inspector, and Macie to
+#    the security alarms SNS topic. Includes SQS dead-letter queue
+#    for failed deliveries.
+# =====================================================================
 
-resource "aws_cloudwatch_event_bus" "main" {
-  count = local.create_finding_notifications && var.eventbridge_bus_name != "default" ? 1 : 0
-
-  name              = var.eventbridge_bus_name
-  kms_key_identifier = var.kms_observability_key_arn
-
-  tags = {
-    Name    = "${var.project_name}-event-bus"
-    Purpose = "Security finding event routing"
-  }
-}
-
-# Encrypt the default bus with KMS when using it
-resource "aws_cloudwatch_event_bus" "default_encryption" {
-  count = local.create_finding_notifications && var.eventbridge_bus_name == "default" ? 1 : 0
-
-  name               = "default"
-  kms_key_identifier = var.kms_observability_key_arn
-}
-
-# Resource policy - least privilege: only this account can put events and manage its own rules
-resource "aws_cloudwatch_event_bus_policy" "main" {
-  count = local.create_finding_notifications ? 1 : 0
-
-  event_bus_name = var.eventbridge_bus_name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowAccountToPutEvents"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action   = "events:PutEvents"
-        Resource = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:event-bus/${var.eventbridge_bus_name}"
-      },
-      {
-        Sid    = "AllowAccountToManageItsRules"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action = [
-          "events:PutRule",
-          "events:PutTargets",
-          "events:DeleteRule",
-          "events:RemoveTargets",
-          "events:DisableRule",
-          "events:EnableRule",
-          "events:TagResource",
-          "events:UntagResource",
-          "events:DescribeRule",
-          "events:ListTargetsByRule",
-          "events:ListTagsForResource"
-        ]
-        Resource = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/${var.eventbridge_bus_name}/*"
-        Condition = {
-          StringEqualsIfExists = {
-            "events:creatorAccount" = data.aws_caller_identity.current.account_id
-          }
-        }
-      }
-    ]
-  })
-
-  depends_on = [
-    aws_cloudwatch_event_bus.main,
-    aws_cloudwatch_event_bus.default_encryption
-  ]
-}
-
-# EventBridge rules - route HIGH/CRITICAL findings from security services to SNS
+# Security services publish finding events to the default bus in the account and region where findings are generated
+# This module only creates rules and targets on the default bus
 
 locals {
   finding_notification_rules = local.create_finding_notifications ? toset([
@@ -1691,7 +1692,7 @@ resource "aws_cloudwatch_event_rule" "findings" {
 
   name           = "${var.project_name}-${each.value}-high-critical"
   description    = "Route HIGH and CRITICAL ${each.value} findings to SNS"
-  event_bus_name = var.eventbridge_bus_name
+  event_bus_name = "default"
 
   event_pattern = local.finding_notification_config[each.value].event_pattern
 
@@ -1743,7 +1744,7 @@ resource "aws_cloudwatch_event_target" "findings_to_sns" {
   for_each = local.finding_notification_rules
 
   rule           = aws_cloudwatch_event_rule.findings[each.key].name
-  event_bus_name = var.eventbridge_bus_name
+  event_bus_name = "default"
   target_id      = "${each.value}-to-sns"
   arn            = aws_sns_topic.security_alarms[0].arn
 

@@ -3,31 +3,41 @@
 ![AWS Badge](https://img.shields.io/badge/AWS-Deployed-4EAA25.svg?style=flat&logo=amazon-aws&logoColor=white)
 ![Terraform Badge](https://img.shields.io/badge/Terraform-IaC-5c4ee5.svg?style=flat&logo=terraform&logoColor=white)
 
-This project automates the deployment of a production-grade, account-level security baseline on AWS. It establishes hardened guardrails aligned with the CIS AWS Foundations Benchmark and AWS cloud best practices, delivering over 100 operational security controls.
+This project automates the deployment of a production-grade, account-level security baseline on AWS. It establishes hardened guardrails aligned with the industry best practices, delivering over 100 operational security controls.
 
 By operating strictly at the account boundary, the project remains entirely decoupled from application or workload infrastructure, serving as a foundational 'Landing Zone Security Layer' safe for use in regulated environments.
 
 ## Features
 
-- **Identity & Access Management** - CIS-hardened password policy out of the box. External Access Analyzer is always-on at account or organization scope. Unused Access Analyzer is opt-in with a configurable staleness threshold for zero-trust hygiene.
+### IAM & Access Control
+> CIS-hardened password policy. External Access Analyzer always-on at account or organization scope. Unused Access Analyzer opt-in with configurable inactivity threshold for zero-trust access reviews.
 
-- **Encryption & Data Protection** - Defense-in-depth encryption with three purpose-built KMS keys (compute, observability, storage), each with automatic rotation and a safe deletion window. EBS encryption by default enforced at the account level with a customer-managed key. All KMS policies are scoped to prevent confused deputy attacks. AMI and snapshot public sharing blocked. IMDSv2 enforced as the account default, EC2 serial console disabled, EMR public access blocked.
+### Encryption & Data Protection
+> Multiple purpose-built KMS keys (compute, observability, storage) with automatic rotation and safe deletion windows. EBS default encryption enforced at account level with a Customer-Managed Key. All KMS key policies scoped to prevent confused deputy attacks. Public AMI/snapshot sharing blocked, IMDSv2 enforced as account default, EC2 serial console disabled.
 
-- **S3 Bucket Security** - CloudTrail, Config, access logs, and access logs meta buckets are hardened end-to-end: versioning, public access blocking, ACLs disabled, KMS encryption (AES256 for log-target buckets), TLS-only bucket policies, and source-scoped write permissions. Access logging enabled across all audit buckets with full chain coverage: CloudTrail and Config log to the access logs bucket, which in turn logs to a dedicated access logs meta bucket as the terminal destination. Intelligent lifecycle management transitions objects through storage tiers to expiration, with multipart upload cleanup and noncurrent version expiration. Object Lock (Governance Mode) available on all four buckets for compliance-grade immutability — disabled by default, enable per-bucket when you need tamper-proof audit logs. Note that Object Lock must be set at bucket creation time; enabling it on an existing bucket will destroy and recreate it.
+### Threat Detection
+> GuardDuty with six individually toggleable protection features, Security Hub with five compliance standards and cross-region finding aggregation, Macie with optional classification export, Inspector v2 scanning EC2/ECR/Lambda, and Detective for graph-based investigation.
 
-- **CloudTrail** - Multi-region trail with log file validation and Insight selectors for anomaly detection. S3 data events are opt-in to keep costs predictable. Organization trail support is conditional and validated. CloudWatch Logs integration with a dedicated, least-privilege IAM role hardened against confused deputy escalation.
+### Organizations Guardrails
+> 10 SCPs covering root usage, region restriction, security service protection, encryption enforcement, public AMI/snapshot blocking, org departure, flow log deletion, MFA deactivation, and IMDSv2 enforcement. Region-deny SCP handles global service exceptions. Tag policies, backup policies, and AI opt-out policies all conditional.
 
-- **AWS Config** - Continuous recording of all resource types including global resources. Least-privilege IAM role with daily configuration snapshots.
+### CloudTrail
+> Multi-region trail with log file validation and Insight selectors for anomaly detection. S3 data events opt-in to control costs. Organization trail support conditional and validated. CloudWatch Logs integration via a least-privilege IAM role hardened against confused deputy escalation. Automatic credential masking via CloudWatch data protection policy (catches AWS secret keys and private keys if they ever appear in logs).
 
-- **Security Alarms** - 13 CIS-aligned CloudWatch metric filters and alarms spanning authentication failures, unauthorized API calls, root usage, and changes to CloudTrail, Config, IAM, KMS, S3, security groups, networking, and VPCs. KMS-encrypted SNS topic with TLS enforcement. Tuned to eliminate false positives. Includes a CloudWatch dashboard for single-pane security visibility.
+### AWS Config
+> Continuous recording of all resource types including global resources. Least-privilege IAM role with daily configuration snapshots. CIS-aligned managed rules for compliance checks. Pre-flight validation detects existing recorders and delivery channels before deployment to avoid conflicts.
 
-- **Threat Detection** - Full-spectrum detection stack: GuardDuty with all six protection features individually toggleable, Security Hub with five compliance standards (versions configurable) and cross-region finding aggregation, Macie with optional classification export, Inspector v2 for vulnerability scanning across EC2/ECR/Lambda, and Detective for graph-based investigation.
+### S3 Security
+> All audit buckets (CloudTrail, Config, access logs, access logs meta) hardened with KMS encryption, public access blocking, TLS-only policies, versioning, ACLs disabled, and source-scoped write permissions. Lifecycle rules manage storage tiering, expiration, multipart cleanup, and noncurrent version retention. Object Lock (Governance Mode by default) supported on all four buckets for tamper-proof immutability (off by default, enable per-bucket as needed).
 
-- **Finding Notifications** - Optional EventBridge rules that route HIGH and CRITICAL findings from GuardDuty, Security Hub, Inspector, and Macie to the security alarms SNS topic. Disabled by default to avoid inbox noise — enable when you're ready to act on findings in near real-time instead of checking the console manually.
+### Security Alarms
+> 13 CIS-aligned CloudWatch metric filters and alarms covering auth failures, unauthorized API calls, root usage, and changes to CloudTrail, Config, IAM, KMS, S3, security groups, networking, and VPCs. KMS-encrypted SNS topic with TLS enforcement, tuned to reduce false positives. SQS dead-letter queue for SNS delivery failures. CloudWatch dashboard for single-pane security visibility.
 
-- **Organizations Guardrails** - Nine granular SCPs covering root usage, region restriction, security service protection, encryption enforcement, public AMI/snapshot blocking, org departure, flow log deletion, MFA deactivation, and IMDSv2 enforcement. Region-deny SCP correctly handles global service exceptions. Input-validated with tag policies, backup policies, and AI opt-out policies all conditional.
+### Finding Notifications
+> EventBridge rules routing HIGH and CRITICAL findings from GuardDuty, Security Hub, Inspector, and Macie to the security alarms SNS topic. SQS dead-letter queue for failed deliveries. Off by default. Enable when you're ready for near real-time alerting.
 
-- **Billing & Governance** - Monthly cost budgets with multi-threshold alerts, ML-powered Cost Anomaly Detection, and alternate contacts for security, billing, and operations teams.
+### Billing & Governance
+> Monthly cost budgets with multi-threshold alerts, ML-powered Cost Anomaly Detection, and alternate contacts for security, billing, and operations.
 
 ## Prerequisites
 
@@ -93,9 +103,9 @@ terraform destroy
 
 ### Existing AWS Services
 
-Some AWS security services only allow a single instance per account per region. If you've previously enabled any of these, whether through the console, another IaC tool, or a past deployment, this module will catch it for you.
+Some AWS security services only allow a single instance per account, per region. If you've previously enabled any of these, this module will catch it for you.
 
-During `terraform plan`, built-in pre-flight checks query your account for existing resources. If a conflict is found, the plan fails early with a clear error message that tells you exactly what exists and how to fix it.
+During `terraform plan`, built-in pre-flight checks query your account for existing resources. If a conflict is found, the plan fails early with a clear error message that tells you exactly what exists and how to fix it. This requires AWS CLI installed on the machine running `terraform plan` and valid AWS credentials available at plan time.
 
 | Service | Limit |
 |---------|-------|
@@ -118,7 +128,7 @@ Error: Resource precondition failed
 
 You have two ways to resolve it:
 
-**Option A: Import the existing resource (recommended).** This tells Terraform to adopt what's already there. On the next apply, Terraform updates it to match your configuration - no data is lost:
+**Option A: Import the existing resource (recommended).** This tells Terraform to adopt what's already there. On the next apply, Terraform updates it to match your configuration (no data is lost):
 
 ```bash
 terraform import '<resource-address>' <identifier>
@@ -196,7 +206,6 @@ See `variables.tf` for the complete list of available variables.
 | `security_hub_arn` | Security Hub ARN |
 | `access_logs_meta_bucket_name` | S3 meta-logging bucket for the access logs bucket |
 | `security_alarms_sns_topic_arn` | SNS topic ARN for security alarm notifications |
-| `security_alarms_enabled` | Whether CIS-aligned security alarms are active |
 | `security_dashboard_name` | CloudWatch dashboard name for security alarms |
 | `external_access_analyzer_arn` | IAM Access Analyzer ARN (external access) |
 | `ebs_encryption_enabled` | Whether EBS encryption by default is enabled |
@@ -206,7 +215,7 @@ See `variables.tf` for the complete list of available variables.
 
 ### Identity & Access Management:
 
-- CIS-aligned IAM account password policy (minimum 14 characters, complexity, 90-day rotation, 24-password reuse prevention)
+- CIS-aligned IAM password policy (minimum 14 characters, complexity, 90-day rotation, 24-password reuse prevention)
 - IAM Access Analyzer for external access detection (ORGANIZATION or ACCOUNT scope)
 - IAM Access Analyzer for unused access detection (identifies overly broad permissions)
 - Password hard expiry configurable for administrator-forced reset
@@ -215,7 +224,7 @@ See `variables.tf` for the complete list of available variables.
 
 - Account-level S3 Block Public Access (all four settings enforced)
 - Blocks public ACLs, public policies, ignores existing public ACLs, restricts public buckets
-- Applied globally — overrides any individual bucket configuration
+- Applied globally, overrides any individual bucket configuration
 
 ### Data Protection & Encryption:
 
@@ -236,7 +245,7 @@ See `variables.tf` for the complete list of available variables.
 - CIS-aligned Config managed rules (root MFA, root access keys, EBS encryption, RDS encryption, KMS rotation, default SG, IAM user MFA, S3 encryption)
 - Dedicated S3 buckets for CloudTrail and Config with BucketOwnerEnforced ownership, versioning, encryption, public access blocking, lifecycle policies, and TLS-only bucket policies
 - Full access logging chain: CloudTrail and Config buckets log to a shared access logs bucket, which logs to a dedicated access logs meta bucket as the terminal destination
-- Optional S3 Object Lock (Governance Mode) on CloudTrail, Config, access logs, and access logs meta buckets — makes audit logs tamper-proof for a configurable retention period
+- Optional S3 Object Lock (Governance Mode) on CloudTrail, Config, access logs, and access logs meta buckets (makes audit logs tamper-proof for a configurable retention period)
 
 ### Security Alarms & Monitoring:
 
@@ -247,9 +256,9 @@ See `variables.tf` for the complete list of available variables.
 - Unauthorized API calls (AccessDenied errors, 5+ in 5 minutes)
 - Root account usage detection (any API call or console login)
 - AWS Organizations changes (conditional — create/delete org, create/remove account)
-- CloudWatch dashboard with time-series graphs for every alarm metric and threshold annotations — provides a single-pane security overview even without email notifications
+- CloudWatch dashboard with time-series graphs for every alarm metric and threshold annotations (provides a single-pane security overview even without email notifications)
 - SNS topic with CloudWatch-only publish policy for alarm delivery
-- Alarms and dashboard deployed when `enable_security_alarms = true`; email notifications are opt-in via `alarm_notification_email`. For active security monitoring, set `alarm_notification_email`.
+- Alarms and dashboard deployed when `enable_security_alarms = true`; email notifications are opt-in via `alarm_notification_email`. For active security monitoring, set `alarm_notification_email`
 
 ### Threat Detection:
 
@@ -279,7 +288,7 @@ See `variables.tf` for the complete list of available variables.
 
 ### Break-Glass Emergency Access for SCPs (Optional)
 
-The `deny-disable-security` and `deny-deactivate-mfa` SCPs block everyone in member accounts from disabling security services. In an emergency - for example, a misbehaving GuardDuty detector flooding your account with false positives, you need a controlled way to act without detaching the SCP and briefly exposing all accounts.
+The `deny-disable-security` and `deny-deactivate-mfa` SCPs block everyone in member accounts from disabling security services. In an emergency, for example, a misbehaving GuardDuty detector flooding your account with false positives, you need a controlled way to act without detaching the SCP and briefly exposing all accounts.
 
 The recommended approach is **account-based break-glass isolation**. Create a dedicated AWS account in its own OU, and don't attach SCPs to that OU. Because this project controls attachment via `scp_target_ou_ids`, you simply leave the break-glass OU out of the list.
 
@@ -296,7 +305,7 @@ The recommended approach is **account-based break-glass isolation**. Create a de
   "Statement": [
     {
       "Effect": "Allow",
-      "Principal": { "AWS": "arn:aws:iam::BREAKGLASS_ACCOUNT_ID:root" },
+      "Principal": { "AWS": "arn:aws:iam::BREAKGLASS_ACCOUNT:root" },
       "Action": "sts:AssumeRole",
       "Condition": {
         "Bool": { "aws:MultiFactorAuthPresent": "true" }
@@ -329,13 +338,9 @@ The SCP stays in place for all other accounts. Only the break-glass session can 
 - Alternate contacts configured for security, billing, and operations teams.
 - All budget alerts conditional on email notification list being provided.
 
-### Deletion Protection:
-
-**Important:** Before deploying to production, uncomment `prevent_destroy = true` in the lifecycle blocks of all KMS keys (`modules/data-protection/main.tf`) and S3 audit buckets (`modules/logging/main.tf`). Without this safeguard, `terraform destroy` can permanently delete your encryption keys and audit trail.
-
 ## State Management (Optional)
 
-Use a remote backend (S3 + DynamoDB) for secure state management and collaboration.
+We recommend using a remote backend (S3 + DynamoDB) for secure state management and collaboration.
 
 ## Known AWS API Limitations
 
@@ -353,8 +358,6 @@ Use a remote backend (S3 + DynamoDB) for secure state management and collaborati
 | **SNS Email Subscriptions** | Require manual confirmation - check inbox after first apply |
 
 ## Cost Considerations
-
-Most security services have free tiers or minimal cost:
 
 | Service | Cost Model |
 |---------|-----------|
