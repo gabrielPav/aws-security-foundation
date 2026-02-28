@@ -269,12 +269,6 @@ variable "cloudwatch_log_retention_days" {
   }
 }
 
-variable "cloudwatch_log_deletion_protection" {
-  description = "Enable deletion protection on the CloudTrail CloudWatch log group"
-  type        = bool
-  default     = true
-}
-
 variable "enable_cloudwatch_data_protection" {
   description = "Enable data protection policy to automatically mask credentials (AWS secret keys, SSH/PGP/PKCS/Putty private keys) if they appear in CloudTrail logs"
   type        = bool

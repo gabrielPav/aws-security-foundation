@@ -58,12 +58,12 @@ module "logging" {
   kms_storage_key_arn       = module.encryption.kms_storage_key_arn
 
   # CloudTrail
-  enable_cloudtrail                  = var.enable_cloudtrail
-  cloudtrail_log_retention_days      = var.cloudtrail_log_retention_days
-  noncurrent_version_retention_days  = var.noncurrent_version_retention_days
-  is_organization_trail         = var.is_organization_account && var.is_organization_trail
-  organization_id               = var.organization_id
-  enable_s3_data_events         = var.enable_s3_data_events
+  enable_cloudtrail                 = var.enable_cloudtrail
+  cloudtrail_log_retention_days     = var.cloudtrail_log_retention_days
+  noncurrent_version_retention_days = var.noncurrent_version_retention_days
+  is_organization_trail             = var.is_organization_account && var.is_organization_trail
+  organization_id                   = var.organization_id
+  enable_s3_data_events             = var.enable_s3_data_events
 
   # AWS Config
   enable_config                        = var.enable_config
@@ -80,9 +80,8 @@ module "logging" {
   enable_config_rule_s3_encryption     = var.enable_config_rule_s3_encryption
 
   # CloudWatch
-  cloudwatch_log_retention_days          = var.cloudwatch_log_retention_days
-  cloudwatch_log_deletion_protection     = var.cloudwatch_log_deletion_protection
-  enable_cloudwatch_data_protection      = var.enable_cloudwatch_data_protection
+  cloudwatch_log_retention_days     = var.cloudwatch_log_retention_days
+  enable_cloudwatch_data_protection = var.enable_cloudwatch_data_protection
 
   # S3 Object Lock
   s3_object_lock_mode                      = var.s3_object_lock_mode

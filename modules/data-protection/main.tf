@@ -90,10 +90,9 @@ resource "aws_kms_key" "compute" {
     Security = "encryption-at-rest"
   }
 
-  # Uncomment in production - losing a KMS key means losing all data encrypted with it
-  # lifecycle {
-  #   prevent_destroy = true
-  # }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_kms_alias" "compute" {
@@ -226,10 +225,9 @@ resource "aws_kms_key" "observability" {
     Security = "encryption-at-rest"
   }
 
-  # Uncomment in production - losing a KMS key means losing all data encrypted with it
-  # lifecycle {
-  #   prevent_destroy = true
-  # }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_kms_alias" "observability" {
@@ -319,10 +317,9 @@ resource "aws_kms_key" "storage" {
     Security = "encryption-at-rest"
   }
 
-  # Uncomment in production - losing a KMS key means losing all data encrypted with it
-  # lifecycle {
-  #   prevent_destroy = true
-  # }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_kms_alias" "storage" {

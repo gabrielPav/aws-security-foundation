@@ -25,10 +25,9 @@ resource "aws_s3_bucket" "cloudtrail" {
     Security = "audit-logs"
   }
 
-  # Uncomment in production - this bucket is your audit trail
-  # lifecycle {
-  #   prevent_destroy = true
-  # }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Enforce bucket owner ownership - disables ACLs
@@ -592,8 +591,7 @@ resource "aws_cloudwatch_log_group" "cloudtrail" {
 
   name                        = "/aws/cloudtrail/${var.project_name}"
   retention_in_days           = var.cloudwatch_log_retention_days
-  kms_key_id                  = var.kms_observability_key_arn
-  deletion_protection_enabled = var.cloudwatch_log_deletion_protection
+  kms_key_id        = var.kms_observability_key_arn
 
   tags = {
     Name    = "${var.project_name}-cloudtrail-logs"
@@ -889,10 +887,9 @@ resource "aws_s3_bucket" "config" {
     Security = "config-history"
   }
 
-  # Uncomment in production - this bucket is your audit trail
-  # lifecycle {
-  #   prevent_destroy = true
-  # }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_s3_bucket_ownership_controls" "config" {

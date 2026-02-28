@@ -1,7 +1,9 @@
 # AWS Security Foundation with Terraform
 
-![AWS Badge](https://img.shields.io/badge/AWS-Deployed-4EAA25.svg?style=flat&logo=amazon-aws&logoColor=white)
-![Terraform Badge](https://img.shields.io/badge/Terraform-IaC-5c4ee5.svg?style=flat&logo=terraform&logoColor=white)
+![AWS Badge](https://img.shields.io/badge/AWS-Deployed-FF9900.svg?style=flat&logo=amazon-aws&logoColor=white)
+![Terraform Badge](https://img.shields.io/badge/Terraform-1.5+-5c4ee5.svg?style=flat&logo=terraform&logoColor=white)
+![Secure Badge](https://img.shields.io/badge/Secure-Ready-4EAA25.svg?style=flat&logo=shield&logoColor=white)
+![Compliance Badge](https://img.shields.io/badge/Compliance-Ready-1565c0.svg?style=flat&logo=checkmarx&logoColor=white)
 
 This project automates the deployment of a production-grade, account-level security baseline on AWS. It establishes hardened guardrails aligned with the industry best practices, delivering over 100 operational security controls.
 
@@ -9,14 +11,14 @@ By operating strictly at the account boundary, the project remains entirely deco
 
 ## Features
 
-### IAM & Access Control
-> CIS-hardened password policy. External Access Analyzer always-on at account or organization scope. Unused Access Analyzer opt-in with configurable inactivity threshold for zero-trust access reviews.
-
 ### Encryption & Data Protection
-> Multiple purpose-built KMS keys (compute, observability, storage) with automatic rotation and safe deletion windows. EBS default encryption enforced at account level with a Customer-Managed Key. All KMS key policies scoped to prevent confused deputy attacks. Public AMI/snapshot sharing blocked, IMDSv2 enforced as account default, EC2 serial console disabled.
+> Purpose-built KMS keys (compute, observability, storage) with automatic rotation and safe deletion windows. EBS default encryption enforced at account level with a Customer-Managed Key. All KMS key policies scoped to prevent confused deputy attacks. Public AMI/snapshot sharing blocked, IMDSv2 enforced as account default, EC2 serial console disabled.
 
 ### Threat Detection
-> GuardDuty with six individually toggleable protection features, Security Hub with five compliance standards and cross-region finding aggregation, Macie with optional classification export, Inspector v2 scanning EC2/ECR/Lambda, and Detective for graph-based investigation.
+> GuardDuty with S3, EKS, RDS, Lambda, malware, and runtime protection enabled by default, Security Hub with five compliance standards and cross-region finding aggregation, Macie with optional classification export, Inspector v2 scanning EC2/ECR/Lambda, and Detective for graph-based investigation.
+
+### IAM & Access Control
+> Strong CIS-hardened password policy. External Access Analyzer always-on at account or organization scope. Unused Access Analyzer opt-in with configurable inactivity threshold for zero-trust access reviews.
 
 ### Organizations Guardrails
 > 10 SCPs covering root usage, region restriction, security service protection, encryption enforcement, public AMI/snapshot blocking, org departure, flow log deletion, MFA deactivation, and IMDSv2 enforcement. Region-deny SCP handles global service exceptions. Tag policies, backup policies, and AI opt-out policies all conditional.
