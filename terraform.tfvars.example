@@ -51,13 +51,10 @@ enable_cloudtrail                 = true
 cloudtrail_log_retention_days     = 365
 noncurrent_version_retention_days = 90  # Noncurrent S3 object versions in CloudTrail and Config buckets
 is_organization_trail             = false
-
-enable_s3_data_events         = false # Enable for object-level audit (increases cost)
-
-enable_config                 = true
-config_log_retention_days     = 365
-enable_cis_config_rules       = true
-
+enable_s3_data_events             = false # Enable for object-level audit (increases cost)
+enable_config                     = true
+config_log_retention_days         = 365
+enable_cis_config_rules           = true
 cloudwatch_log_retention_days     = 365
 enable_cloudwatch_data_protection = true  # Masks credentials (secret keys, private keys) if they appear in CloudTrail logs
 
@@ -114,10 +111,10 @@ enable_macie = true
 # macie_kms_key_arn = "arn:aws:kms:<aws-region>:<aws-account>:key/<key-id>"
 
 # Inspector
-enable_inspector             = true
-enable_inspector_ec2         = true
-enable_inspector_ecr         = true
-enable_inspector_lambda      = true
+enable_inspector        = true
+enable_inspector_ec2    = true
+enable_inspector_ecr    = true
+enable_inspector_lambda = true
 
 enable_inspector_lambda_code = false # Scans application code in Lambda functions for vulnerabilities (increases cost)
 

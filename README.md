@@ -23,14 +23,14 @@ By operating strictly at the account boundary, the project remains entirely deco
 ### Organizations Guardrails
 > 10 SCPs covering root usage, region restriction, security service protection, encryption enforcement, public AMI/snapshot blocking, org departure, flow log deletion, MFA deactivation, and IMDSv2 enforcement. Region-deny SCP handles global service exceptions. Tag policies, backup policies, and AI opt-out policies all conditional.
 
+### S3 Security
+> All audit buckets (CloudTrail, Config, access logs, access logs meta) hardened with KMS encryption, public access blocking, TLS-only policies, versioning, ACLs disabled, and source-scoped write permissions. Lifecycle rules manage storage tiering, expiration, multipart cleanup, and noncurrent version retention. Object Lock (Governance Mode by default) supported on all four buckets for tamper-proof immutability (off by default, enable per-bucket as needed).
+
 ### CloudTrail
 > Multi-region trail with log file validation and Insight selectors for anomaly detection. S3 data events opt-in to control costs. Organization trail support conditional and validated. CloudWatch Logs integration via a least-privilege IAM role hardened against confused deputy escalation. Automatic credential masking via CloudWatch data protection policy (catches AWS secret keys and private keys if they ever appear in logs).
 
 ### AWS Config
 > Continuous recording of all resource types including global resources. Least-privilege IAM role with daily configuration snapshots. CIS-aligned managed rules for compliance checks. Pre-flight validation detects existing recorders and delivery channels before deployment to avoid conflicts.
-
-### S3 Security
-> All audit buckets (CloudTrail, Config, access logs, access logs meta) hardened with KMS encryption, public access blocking, TLS-only policies, versioning, ACLs disabled, and source-scoped write permissions. Lifecycle rules manage storage tiering, expiration, multipart cleanup, and noncurrent version retention. Object Lock (Governance Mode by default) supported on all four buckets for tamper-proof immutability (off by default, enable per-bucket as needed).
 
 ### Security Alarms
 > 13 CIS-aligned CloudWatch metric filters and alarms covering auth failures, unauthorized API calls, root usage, and changes to CloudTrail, Config, IAM, KMS, S3, security groups, networking, and VPCs. KMS-encrypted SNS topic with TLS enforcement, tuned to reduce false positives. SQS dead-letter queue for SNS delivery failures. CloudWatch dashboard for single-pane security visibility.
@@ -99,7 +99,7 @@ terraform output security_baseline_summary
 
 ### Destroy Infrastructure
 
-> **Note:** S3 buckets and KMS keys have `prevent_destroy = true` to guard against accidental deletion. To tear down, set `prevent_destroy = false` in these files before running destroy:
+> **Note:** S3 buckets and KMS keys have `prevent_destroy = true` to guard against accidental deletion. To tear down, set `prevent_destroy = false` in these files before running `terraform destroy`:
 > - `modules/logging/main.tf` (CloudTrail bucket, KMS key)
 > - `modules/data-protection/main.tf` (EBS, compute, and observability KMS keys)
 

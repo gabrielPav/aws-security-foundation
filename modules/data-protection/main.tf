@@ -165,6 +165,23 @@ resource "aws_kms_key" "observability" {
         }
       },
       {
+        Sid    = "AllowCloudWatchAlarmsToUseTheKey"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudwatch.amazonaws.com"
+        }
+        Action = [
+          "kms:GenerateDataKey*",
+          "kms:Decrypt"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = local.account_id
+          }
+        }
+      },
+      {
         Sid    = "AllowSNSToUseTheKey"
         Effect = "Allow"
         Principal = {

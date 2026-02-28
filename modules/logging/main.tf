@@ -165,7 +165,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
   bucket = aws_s3_bucket.access_logs[0].id
 
   rule {
-    id     = "transition-logs-to-ia"
+    id     = "manage-log-lifecycle"
     status = "Enabled"
     filter {}
 
@@ -176,12 +176,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
         storage_class = "STANDARD_IA"
       }
     }
-  }
-
-  rule {
-    id     = "transition-logs-to-glacier"
-    status = "Enabled"
-    filter {}
 
     dynamic "transition" {
       for_each = var.access_log_retention_days > var.s3_transition_to_glacier_days ? [1] : []
@@ -190,12 +184,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
         storage_class = "GLACIER"
       }
     }
-  }
-
-  rule {
-    id     = "expire-old-logs"
-    status = "Enabled"
-    filter {}
 
     expiration {
       days = var.access_log_retention_days
@@ -332,7 +320,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs_meta" {
   bucket = aws_s3_bucket.access_logs_meta[0].id
 
   rule {
-    id     = "transition-logs-to-ia"
+    id     = "manage-log-lifecycle"
     status = "Enabled"
     filter {}
 
@@ -343,12 +331,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs_meta" {
         storage_class = "STANDARD_IA"
       }
     }
-  }
-
-  rule {
-    id     = "transition-logs-to-glacier"
-    status = "Enabled"
-    filter {}
 
     dynamic "transition" {
       for_each = var.access_log_retention_days > var.s3_transition_to_glacier_days ? [1] : []
@@ -357,12 +339,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs_meta" {
         storage_class = "GLACIER"
       }
     }
-  }
-
-  rule {
-    id     = "expire-old-logs"
-    status = "Enabled"
-    filter {}
 
     expiration {
       days = var.access_log_retention_days
@@ -589,8 +565,8 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
 resource "aws_cloudwatch_log_group" "cloudtrail" {
   count = var.enable_cloudtrail ? 1 : 0
 
-  name                        = "/aws/cloudtrail/${var.project_name}"
-  retention_in_days           = var.cloudwatch_log_retention_days
+  name              = "/aws/cloudtrail/${var.project_name}"
+  retention_in_days = var.cloudwatch_log_retention_days
   kms_key_id        = var.kms_observability_key_arn
 
   tags = {
@@ -799,7 +775,7 @@ resource "aws_cloudtrail" "main" {
 
 # Pre-flight: detect existing Config resources (AWS allows only one recorder and one delivery channel per region)
 data "external" "existing_config_recorder" {
-  count   = var.enable_config ? 1 : 0
+  count = var.enable_config ? 1 : 0
   program = [
     "bash", "-c",
     "name=$(aws configservice describe-configuration-recorders --region ${data.aws_region.current.name} --query 'ConfigurationRecorders[0].name' --output text 2>/dev/null || echo ''); [ \"$name\" = 'None' ] && name=''; printf '{\"name\":\"%s\"}' \"$name\""
@@ -807,7 +783,7 @@ data "external" "existing_config_recorder" {
 }
 
 data "external" "existing_delivery_channel" {
-  count   = var.enable_config ? 1 : 0
+  count = var.enable_config ? 1 : 0
   program = [
     "bash", "-c",
     "name=$(aws configservice describe-delivery-channels --region ${data.aws_region.current.name} --query 'DeliveryChannels[0].name' --output text 2>/dev/null || echo ''); [ \"$name\" = 'None' ] && name=''; printf '{\"name\":\"%s\"}' \"$name\""
@@ -1174,6 +1150,15 @@ resource "aws_iam_role_policy" "config_s3" {
           "kms:GenerateDataKey"
         ]
         Resource = var.kms_storage_key_arn
+      },
+      {
+        Sid    = "AllowConfigKMSEvaluation"
+        Effect = "Allow"
+        Action = [
+          "kms:DescribeKey",
+          "kms:GetKeyRotationStatus"
+        ]
+        Resource = "arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:key/*"
       }
     ]
   })
@@ -1185,6 +1170,7 @@ resource "aws_config_delivery_channel" "main" {
 
   name           = "${var.project_name}-config-delivery"
   s3_bucket_name = aws_s3_bucket.config[0].id
+  s3_kms_key_arn = var.kms_storage_key_arn
 
   snapshot_delivery_properties {
     delivery_frequency = "TwentyFour_Hours"
@@ -1521,9 +1507,9 @@ resource "aws_sqs_queue_policy" "sns_subscription_dlq" {
 resource "aws_sns_topic_subscription" "security_alarms_email" {
   count = local.create_notifications ? 1 : 0
 
-  topic_arn            = aws_sns_topic.security_alarms[0].arn
-  protocol             = "email"
-  endpoint             = var.alarm_notification_email
+  topic_arn = aws_sns_topic.security_alarms[0].arn
+  protocol  = "email"
+  endpoint  = var.alarm_notification_email
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.sns_subscription_dlq[0].arn
   })
@@ -1700,9 +1686,9 @@ resource "aws_cloudwatch_event_rule" "findings" {
 resource "aws_sqs_queue" "findings_dlq" {
   count = local.create_finding_notifications ? 1 : 0
 
-  name                       = "${var.project_name}-findings-dlq"
-  message_retention_seconds  = 1209600 # 14 days
-  kms_master_key_id          = var.kms_observability_key_id
+  name                              = "${var.project_name}-findings-dlq"
+  message_retention_seconds         = 1209600 # 14 days
+  kms_master_key_id                 = var.kms_observability_key_id
   kms_data_key_reuse_period_seconds = 300
 
   tags = {

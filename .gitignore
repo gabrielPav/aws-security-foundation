@@ -47,3 +47,6 @@ modules/**/.terraform.lock.hcl
 # OS files
 .DS_Store
 Thumbs.db
+
+# Validation scripts
+scripts/
