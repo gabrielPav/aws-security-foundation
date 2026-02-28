@@ -99,6 +99,10 @@ terraform output security_baseline_summary
 
 ### Destroy Infrastructure
 
+> **Note:** S3 buckets and KMS keys have `prevent_destroy = true` to guard against accidental deletion. To tear down, set `prevent_destroy = false` in these files before running destroy:
+> - `modules/logging/main.tf` (CloudTrail bucket, KMS key)
+> - `modules/data-protection/main.tf` (EBS, compute, and observability KMS keys)
+
 ```bash
 terraform destroy
 ```
