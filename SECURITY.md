@@ -1,6 +1,6 @@
-# Implemented Security Best Practices (High Level)
+# Implemented Security Best Practices
 
-This document details the security controls implemented by the AWS Security Foundation.
+This document details the security controls deployed by the AWS Security Foundation.
 
 ## Identity & Access Management
 

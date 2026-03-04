@@ -18,6 +18,11 @@ resource "aws_accessanalyzer_analyzer" "external" {
   analyzer_name = "${var.project_name}-external-access-analyzer"
   type          = var.is_organization_account ? "ORGANIZATION" : "ACCOUNT"
 
+  tags = {
+    Name     = "${var.project_name}-external-access-analyzer"
+    Purpose  = "External access detection"
+    Security = "access-analysis"
+  }
 }
 
 # Unused access analyzer - surfaces overly broad grants that should be tightened
@@ -33,4 +38,9 @@ resource "aws_accessanalyzer_analyzer" "unused" {
     }
   }
 
+  tags = {
+    Name     = "${var.project_name}-unused-access-analyzer"
+    Purpose  = "Unused access detection"
+    Security = "access-analysis"
+  }
 }
