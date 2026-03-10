@@ -23,7 +23,9 @@
 - **Break-glass emergency access** - SCP guardrails with documented escape hatch for incidents.
 - **Pre-flight conflict detection** - Fails early if Config/GuardDuty already exist, with exact fix commands.
 
----
+## Architecture (High Level)
+
+![AWS Security Foundation Architecture](assets/diagram.png)
 
 ## Key Features
 
