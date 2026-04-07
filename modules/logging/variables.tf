@@ -142,6 +142,11 @@ variable "noncurrent_version_retention_days" {
   description = "Days to retain noncurrent S3 object versions in CloudTrail and Config buckets before expiration. Should align with your log retention policy."
   type        = number
   default     = 90
+
+  validation {
+    condition     = var.noncurrent_version_retention_days >= 1
+    error_message = "Noncurrent version retention must be at least 1 day."
+  }
 }
 
 variable "cloudwatch_log_retention_days" {

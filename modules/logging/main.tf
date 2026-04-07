@@ -528,7 +528,7 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
         Action    = "s3:PutObject"
         Resource  = "${aws_s3_bucket.cloudtrail[0].arn}/*"
         Condition = {
-          StringNotEquals = {
+          StringNotEqualsIfExists = {
             "s3:x-amz-server-side-encryption" = "aws:kms"
           }
         }
@@ -778,7 +778,7 @@ data "external" "existing_config_recorder" {
   count = var.enable_config ? 1 : 0
   program = [
     "bash", "-c",
-    "name=$(aws configservice describe-configuration-recorders --region ${data.aws_region.current.name} --query 'ConfigurationRecorders[0].name' --output text 2>/dev/null || echo ''); [ \"$name\" = 'None' ] && name=''; printf '{\"name\":\"%s\"}' \"$name\""
+    "if ! name=$(aws configservice describe-configuration-recorders --region ${data.aws_region.current.name} --query 'ConfigurationRecorders[0].name' --output text 2>/dev/null); then printf '{\"name\":\"CLI_ERROR\"}'; exit 0; fi; [ \"$name\" = 'None' ] && name=''; printf '{\"name\":\"%s\"}' \"$name\""
   ]
 }
 
@@ -786,7 +786,7 @@ data "external" "existing_delivery_channel" {
   count = var.enable_config ? 1 : 0
   program = [
     "bash", "-c",
-    "name=$(aws configservice describe-delivery-channels --region ${data.aws_region.current.name} --query 'DeliveryChannels[0].name' --output text 2>/dev/null || echo ''); [ \"$name\" = 'None' ] && name=''; printf '{\"name\":\"%s\"}' \"$name\""
+    "if ! name=$(aws configservice describe-delivery-channels --region ${data.aws_region.current.name} --query 'DeliveryChannels[0].name' --output text 2>/dev/null); then printf '{\"name\":\"CLI_ERROR\"}'; exit 0; fi; [ \"$name\" = 'None' ] && name=''; printf '{\"name\":\"%s\"}' \"$name\""
   ]
 }
 
@@ -798,15 +798,19 @@ resource "terraform_data" "validate_config_recorder" {
   lifecycle {
     precondition {
       condition = (
-        data.external.existing_config_recorder[0].result.name == "" ||
-        data.external.existing_config_recorder[0].result.name == "${var.project_name}-config-recorder" ||
-        length(aws_config_configuration_recorder.main) > 0
+        data.external.existing_config_recorder[0].result.name != "CLI_ERROR" &&
+        (data.external.existing_config_recorder[0].result.name == "" ||
+        data.external.existing_config_recorder[0].result.name == "${var.project_name}-config-recorder")
       )
       error_message = <<-EOT
+        %{if data.external.existing_config_recorder[0].result.name == "CLI_ERROR"}
+        Pre-flight check failed: AWS CLI could not query Config recorders. Ensure the AWS CLI is installed, credentials are valid, and you have config:DescribeConfigurationRecorders permission.
+        %{else}
         An AWS Config recorder '${data.external.existing_config_recorder[0].result.name}' already exists in ${data.aws_region.current.name}.
         AWS allows only one Config recorder per region. Either:
           1. Import it:  terraform import 'module.logging.aws_config_configuration_recorder.main[0]' ${data.external.existing_config_recorder[0].result.name}
           2. Delete it:  aws configservice delete-configuration-recorder --region ${data.aws_region.current.name} --configuration-recorder-name ${data.external.existing_config_recorder[0].result.name}
+        %{endif}
       EOT
     }
   }
@@ -818,15 +822,19 @@ resource "terraform_data" "validate_delivery_channel" {
   lifecycle {
     precondition {
       condition = (
-        data.external.existing_delivery_channel[0].result.name == "" ||
-        data.external.existing_delivery_channel[0].result.name == "${var.project_name}-config-delivery" ||
-        length(aws_config_delivery_channel.main) > 0
+        data.external.existing_delivery_channel[0].result.name != "CLI_ERROR" &&
+        (data.external.existing_delivery_channel[0].result.name == "" ||
+        data.external.existing_delivery_channel[0].result.name == "${var.project_name}-config-delivery")
       )
       error_message = <<-EOT
+        %{if data.external.existing_delivery_channel[0].result.name == "CLI_ERROR"}
+        Pre-flight check failed: AWS CLI could not query Config delivery channels. Ensure the AWS CLI is installed, credentials are valid, and you have config:DescribeDeliveryChannels permission.
+        %{else}
         An AWS Config delivery channel '${data.external.existing_delivery_channel[0].result.name}' already exists in ${data.aws_region.current.name}.
         AWS allows only one delivery channel per region. Either:
           1. Import it:  terraform import 'module.logging.aws_config_delivery_channel.main[0]' ${data.external.existing_delivery_channel[0].result.name}
           2. Delete it:  aws configservice delete-delivery-channel --region ${data.aws_region.current.name} --delivery-channel-name ${data.external.existing_delivery_channel[0].result.name}
+        %{endif}
       EOT
     }
   }
@@ -1053,7 +1061,7 @@ resource "aws_s3_bucket_policy" "config" {
         Action    = "s3:PutObject"
         Resource  = "${aws_s3_bucket.config[0].arn}/*"
         Condition = {
-          StringNotEquals = {
+          StringNotEqualsIfExists = {
             "s3:x-amz-server-side-encryption" = "aws:kms"
           }
         }

@@ -2,34 +2,34 @@
 
 # Pre-flight: detect existing singleton resources (AWS allows only one per region)
 data "external" "existing_guardduty_detector" {
-  count   = var.enable_guardduty ? 1 : 0
+  count = var.enable_guardduty ? 1 : 0
   program = [
     "bash", "-c",
-    "id=$(aws guardduty list-detectors --region ${data.aws_region.current.name} --query 'DetectorIds[0]' --output text 2>/dev/null || echo ''); [ \"$id\" = 'None' ] && id=''; printf '{\"id\":\"%s\"}' \"$id\""
+    "if ! id=$(aws guardduty list-detectors --region ${data.aws_region.current.name} --query 'DetectorIds[0]' --output text 2>/dev/null); then printf '{\"id\":\"CLI_ERROR\"}'; exit 0; fi; [ \"$id\" = 'None' ] && id=''; printf '{\"id\":\"%s\"}' \"$id\""
   ]
 }
 
 data "external" "existing_security_hub" {
-  count   = var.enable_security_hub ? 1 : 0
+  count = var.enable_security_hub ? 1 : 0
   program = [
     "bash", "-c",
-    "arn=$(aws securityhub describe-hub --region ${data.aws_region.current.name} --query 'HubArn' --output text 2>/dev/null || echo ''); [ \"$arn\" = 'None' ] && arn=''; printf '{\"arn\":\"%s\"}' \"$arn\""
+    "err=$(aws securityhub describe-hub --region ${data.aws_region.current.name} --query 'HubArn' --output text 2>&1); rc=$?; if [ $rc -ne 0 ]; then if echo \"$err\" | grep -qi 'not subscribed\\|InvalidAccessException'; then printf '{\"arn\":\"\"}'; else printf '{\"arn\":\"CLI_ERROR\"}'; fi; exit 0; fi; [ \"$err\" = 'None' ] && err=''; printf '{\"arn\":\"%s\"}' \"$err\""
   ]
 }
 
 data "external" "existing_macie" {
-  count   = var.enable_macie ? 1 : 0
+  count = var.enable_macie ? 1 : 0
   program = [
     "bash", "-c",
-    "status=$(aws macie2 get-macie-session --region ${data.aws_region.current.name} --query 'status' --output text 2>/dev/null || echo ''); [ \"$status\" = 'ENABLED' ] && printf '{\"enabled\":\"true\"}' || printf '{\"enabled\":\"false\"}'"
+    "err=$(aws macie2 get-macie-session --region ${data.aws_region.current.name} --query 'status' --output text 2>&1); rc=$?; if [ $rc -ne 0 ]; then if echo \"$err\" | grep -qi 'Macie is not enabled\\|AccessDeniedException\\|DisabledException'; then printf '{\"enabled\":\"false\"}'; else printf '{\"enabled\":\"CLI_ERROR\"}'; fi; exit 0; fi; [ \"$err\" = 'ENABLED' ] && printf '{\"enabled\":\"true\"}' || printf '{\"enabled\":\"false\"}'"
   ]
 }
 
 data "external" "existing_detective" {
-  count   = var.enable_detective ? 1 : 0
+  count = var.enable_detective ? 1 : 0
   program = [
     "bash", "-c",
-    "arn=$(aws detective list-graphs --region ${data.aws_region.current.name} --query 'GraphList[0].Arn' --output text 2>/dev/null || echo ''); [ \"$arn\" = 'None' ] && arn=''; printf '{\"arn\":\"%s\"}' \"$arn\""
+    "if ! arn=$(aws detective list-graphs --region ${data.aws_region.current.name} --query 'GraphList[0].Arn' --output text 2>/dev/null); then printf '{\"arn\":\"CLI_ERROR\"}'; exit 0; fi; [ \"$arn\" = 'None' ] && arn=''; printf '{\"arn\":\"%s\"}' \"$arn\""
   ]
 }
 
@@ -40,12 +40,16 @@ resource "terraform_data" "validate_guardduty" {
 
   lifecycle {
     precondition {
-      condition     = data.external.existing_guardduty_detector[0].result.id == "" || length(aws_guardduty_detector.main) > 0
+      condition     = data.external.existing_guardduty_detector[0].result.id != "CLI_ERROR" && (data.external.existing_guardduty_detector[0].result.id == "" || data.external.existing_guardduty_detector[0].result.id == try(aws_guardduty_detector.main[0].id, ""))
       error_message = <<-EOT
+        %{if data.external.existing_guardduty_detector[0].result.id == "CLI_ERROR"}
+        Pre-flight check failed: AWS CLI could not query GuardDuty detectors. Ensure the AWS CLI is installed, credentials are valid, and you have guardduty:ListDetectors permission.
+        %{else}
         A GuardDuty detector '${data.external.existing_guardduty_detector[0].result.id}' already exists in ${data.aws_region.current.name}.
         AWS allows only one detector per region. Either:
           1. Import it:  terraform import 'module.threat_detection.aws_guardduty_detector.main[0]' ${data.external.existing_guardduty_detector[0].result.id}
           2. Delete it:  aws guardduty delete-detector --region ${data.aws_region.current.name} --detector-id ${data.external.existing_guardduty_detector[0].result.id}
+        %{endif}
       EOT
     }
   }
@@ -56,12 +60,16 @@ resource "terraform_data" "validate_security_hub" {
 
   lifecycle {
     precondition {
-      condition     = data.external.existing_security_hub[0].result.arn == "" || length(aws_securityhub_account.main) > 0
+      condition     = data.external.existing_security_hub[0].result.arn != "CLI_ERROR" && (data.external.existing_security_hub[0].result.arn == "" || try(aws_securityhub_account.main[0].id, "") != "")
       error_message = <<-EOT
+        %{if data.external.existing_security_hub[0].result.arn == "CLI_ERROR"}
+        Pre-flight check failed: AWS CLI could not query Security Hub. Ensure the AWS CLI is installed, credentials are valid, and you have securityhub:DescribeHub permission.
+        %{else}
         Security Hub is already enabled in ${data.aws_region.current.name} (${data.external.existing_security_hub[0].result.arn}).
         AWS allows only one Security Hub per region. Either:
           1. Import it:  terraform import 'module.threat_detection.aws_securityhub_account.main[0]' ${data.aws_caller_identity.current.account_id}
           2. Disable it: aws securityhub disable-security-hub --region ${data.aws_region.current.name}
+        %{endif}
       EOT
     }
   }
@@ -72,12 +80,16 @@ resource "terraform_data" "validate_macie" {
 
   lifecycle {
     precondition {
-      condition     = data.external.existing_macie[0].result.enabled == "false" || length(aws_macie2_account.main) > 0
+      condition     = data.external.existing_macie[0].result.enabled != "CLI_ERROR" && (data.external.existing_macie[0].result.enabled == "false" || try(aws_macie2_account.main[0].id, "") != "")
       error_message = <<-EOT
+        %{if data.external.existing_macie[0].result.enabled == "CLI_ERROR"}
+        Pre-flight check failed: AWS CLI could not query Macie. Ensure the AWS CLI is installed, credentials are valid, and you have macie2:GetMacieSession permission.
+        %{else}
         Macie is already enabled in ${data.aws_region.current.name}.
         AWS allows only one Macie session per region. Either:
           1. Import it:  terraform import 'module.threat_detection.aws_macie2_account.main[0]' ${data.aws_caller_identity.current.account_id}
           2. Disable it: aws macie2 disable-macie --region ${data.aws_region.current.name}
+        %{endif}
       EOT
     }
   }
@@ -88,12 +100,16 @@ resource "terraform_data" "validate_detective" {
 
   lifecycle {
     precondition {
-      condition     = data.external.existing_detective[0].result.arn == "" || length(aws_detective_graph.main) > 0
+      condition     = data.external.existing_detective[0].result.arn != "CLI_ERROR" && (data.external.existing_detective[0].result.arn == "" || data.external.existing_detective[0].result.arn == try(aws_detective_graph.main[0].id, ""))
       error_message = <<-EOT
+        %{if data.external.existing_detective[0].result.arn == "CLI_ERROR"}
+        Pre-flight check failed: AWS CLI could not query Detective. Ensure the AWS CLI is installed, credentials are valid, and you have detective:ListGraphs permission.
+        %{else}
         A Detective graph already exists in ${data.aws_region.current.name} (${data.external.existing_detective[0].result.arn}).
         AWS allows only one Detective graph per region. Either:
           1. Import it:  terraform import 'module.threat_detection.aws_detective_graph.main[0]' ${data.external.existing_detective[0].result.arn}
           2. Delete it:  aws detective delete-graph --region ${data.aws_region.current.name} --graph-arn ${data.external.existing_detective[0].result.arn}
+        %{endif}
       EOT
     }
   }

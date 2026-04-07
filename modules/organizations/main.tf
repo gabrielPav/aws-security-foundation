@@ -489,6 +489,17 @@ resource "aws_organizations_policy_attachment" "deny_imdsv1" {
   target_id = each.value
 }
 
+resource "terraform_data" "validate_tag_policy_targets" {
+  count = var.enable_tag_policies ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = length(var.scp_target_ou_ids) > 0
+      error_message = "scp_target_ou_ids must not be empty when enable_tag_policies is true. The tag policy would be created but not attached to any OU."
+    }
+  }
+}
+
 # Tag policy - enforce consistent tagging across the organization
 resource "aws_organizations_policy" "tag_policy" {
   count = var.enable_tag_policies ? 1 : 0
@@ -521,6 +532,17 @@ resource "aws_organizations_policy_attachment" "tag_policy" {
 
   policy_id = aws_organizations_policy.tag_policy[0].id
   target_id = each.value
+}
+
+resource "terraform_data" "validate_backup_policy_targets" {
+  count = var.enable_backup_policies ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = length(var.scp_target_ou_ids) > 0
+      error_message = "scp_target_ou_ids must not be empty when enable_backup_policies is true. The backup policy would be created but not attached to any OU."
+    }
+  }
 }
 
 # Backup policy - organization-wide daily backup with retention
@@ -585,6 +607,17 @@ resource "aws_organizations_policy_attachment" "backup_policy" {
 
   policy_id = aws_organizations_policy.backup_policy[0].id
   target_id = each.value
+}
+
+resource "terraform_data" "validate_ai_opt_out_targets" {
+  count = var.enable_ai_opt_out_policy ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = length(var.scp_target_ou_ids) > 0
+      error_message = "scp_target_ou_ids must not be empty when enable_ai_opt_out_policy is true. The AI opt-out policy would be created but not attached to any OU."
+    }
+  }
 }
 
 # AI services opt-out - prevents AWS from using content for ML training
